@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (error) {
-    return new NextResponse(`Webhook error: ${error.message}`, { status: 400 });
+    return new NextResponse(`Webhook error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 400 });
   }
 
   // Handle checkout.session.completed
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       stripeSubscriptionId: subscription.id,
       stripeCustomerId: subscription.customer as string,
       stripePriceId: subscription.items.data[0].price.id,
-      stripeCurrentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      stripeCurrentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
     });
   }
   // Handle invoice.payment_succeeded for subscription renewals
@@ -49,9 +49,10 @@ export async function POST(req: Request) {
     const invoice = event.data.object as Stripe.Invoice; // Correct type for this block
 
     // Ensure it's a subscription payment, not for other invoice items
-    if (invoice.subscription && typeof invoice.subscription === "string") {
+    const invoiceSubscription = (invoice as unknown as { subscription: string | null }).subscription;
+    if (invoiceSubscription && typeof invoiceSubscription === "string") {
       const subscription = await stripe.subscriptions.retrieve(
-        invoice.subscription as string
+        invoiceSubscription
       );
 
       // We need userId to update the correct userSubscription record.
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
         .set({
           stripePriceId: subscription.items.data[0].price.id,
           stripeCurrentPeriodEnd: new Date(
-            subscription.current_period_end * 1000
+            (subscription as unknown as { current_period_end: number }).current_period_end * 1000
           ),
         })
         .where(eq(userSubscription.stripeSubscriptionId, subscription.id));

@@ -62,6 +62,14 @@ export const reduceHearts = async (challengeId: number) => {
   const currentUserProgress = await getUserProgress();
   const userSubscription = await getUserSubscription();
 
+  // Debug logging
+  console.log('=== REDUCE HEARTS DEBUG ===');
+  console.log('User ID:', userId);
+  console.log('Challenge ID:', challengeId);
+  console.log('User has subscription:', !!userSubscription);
+  console.log('Subscription isActive:', userSubscription?.isActive);
+  console.log('Current hearts:', currentUserProgress?.hearts);
+
   const challenge = await db.query.challenges.findFirst({
     where: eq(challenges.id, challengeId),
   });
@@ -80,8 +88,10 @@ export const reduceHearts = async (challengeId: number) => {
   });
 
   const isPractice = !!existingChallengeProgress;
+  console.log('Is practice mode:', isPractice);
 
   if (isPractice) {
+    console.log('Practice mode detected - returning early');
     return { error: "practice" };
   }
 
@@ -89,15 +99,20 @@ export const reduceHearts = async (challengeId: number) => {
     throw new Error("User progress not found");
   }
 
+  // This is the key check - if user has active subscription, don't reduce hearts
   if (userSubscription?.isActive) {
+    console.log('User has active subscription - skipping heart reduction');
     revalidatePath("/learn");
     revalidatePath(`/lesson/${lessonId}`);
     return;
   }
 
   if (currentUserProgress.hearts === 0) {
+    console.log('User has 0 hearts - showing hearts modal');
     return { error: "hearts" };
   }
+
+  console.log('Reducing hearts from', currentUserProgress.hearts, 'to', Math.max(currentUserProgress.hearts - 1, 0));
 
   await db
     .update(userProgress)

@@ -184,22 +184,19 @@ export const getLesson = cache(async (id?: number) => {
 
 export const getLessonPercentage = cache(async () => {
   const courseProgress = await getCourseProgress();
-  if (!courseProgress?.activeLesson) {
+  if (!courseProgress?.activeLessonId) {
     return 0;
   }
   const lesson = await getLesson(courseProgress.activeLessonId);
-
   if (!lesson) {
     return 0;
   }
-
   const completedChallenges = lesson.challenges.filter(
     (challenge) => challenge.completed
   );
   const percentage = Math.round(
     (completedChallenges.length / lesson.challenges.length) * 100
   );
-
   return percentage;
 });
 
@@ -209,22 +206,30 @@ export const getUserSubscription = cache(async () => {
   if (!userId) {
     return null;
   }
-  const data = await db.query.userSubscription.findFirst({
-    where: eq(userSubscription.userId, userId),
-  });
+  
+  try {
+    const data = await db.query.userSubscription.findFirst({
+      where: eq(userSubscription.userId, userId),
+    });
 
-  if (!data) {
+    if (!data) {
+      return null;
+    }
+
+    const isActive = !!(
+      data.stripePriceId &&
+      data.stripeCurrentPeriodEnd &&
+      data.stripeCurrentPeriodEnd.getTime() + DAY_IN_MS > Date.now()
+    );
+
+    return {
+      ...data,
+      isActive,
+    };
+  } catch (error) {
+    console.error('Error fetching user subscription:', error);
     return null;
   }
-
-  const isActive =
-    data.stripePriceId &&
-    data.stripeCurrentPeriodEnd?.getTime()! + DAY_IN_MS > Date.now();
-
-  return {
-    ...data,
-    isActive: !!isActive,
-  };
 });
 
 export const getTopUsers = cache(async () => {
