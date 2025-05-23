@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <body className={`${font.variable} antialiased`}>
+        <body className={`${font.className} antialiased`}>
           <Toaster />
           <ExitModal />
           <HeartsModal />
